@@ -27,27 +27,41 @@ const sanitizeOption = {
   },
   allowedSchemes: ['data', 'http'],
 };
-export const getPostById = (ctx, next) => {
+export const getPostById = async (ctx, next) => {
   const { id } = ctx.params;
+  
   if (!ObjectId.isValid(id)) {
     ctx.status = 400; // Bad Request
     return;
   }
   try {
-    const post = Post.findById(id);
-    console.log('aa');
+  
+    const post = await Post.findById(id);
+  
     // 포스트가 존재하지 않을 때
     if (!post) {
       ctx.status = 404; // Not Found
       return;
     }
     ctx.state.post = post;
+    //console.log(ctx.state.post);
+    //return;
     return next();
   } catch (e) {
-    console.log('bb');
+    //console.log('bb');
     ctx.throw(500, e);
   }
 };
+
+export const checkOwnPost = (ctx, next) => {
+  const { user, post } = ctx.state;
+  if (post.user._id.toString() !== user._id) {
+    ctx.status = 403;
+    return;
+  }
+  return next();
+};
+
 export const write = async ctx => {
   const schema = Joi.object().keys({
     // 객체가 다음 필드를 가지고 있음을 검증
@@ -161,14 +175,6 @@ export const list = async ctx => {
     ctx.throw(500, e);
   }
 };
-
-export const read = ctx => {
-  console.log('cc');
-  ctx.body = ctx.state.post;
-};
-
-  GET /api/posts/:id
-*/
 export const read = async ctx => {
   const { id } = ctx.params;
   try {
@@ -182,6 +188,15 @@ export const read = async ctx => {
     ctx.throw(500, e);
   }
 };
+
+
+  GET /api/posts/:id
+*/
+export const read = ctx => {
+  //console.log('cc');
+  ctx.body = ctx.state.post;
+};
+
 export const remove = async ctx => {
   const { id } = ctx.params;
   try {
@@ -231,11 +246,3 @@ export const update = async ctx => {
   }
 };
 
-export const checkOwnPost = (ctx, next) => {
-  const { user, post } = ctx.state;
-  if (post.user._id.toString() !== user._id) {
-    ctx.status = 403;
-    return;
-  }
-  return next();
-};
