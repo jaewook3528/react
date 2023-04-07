@@ -4,6 +4,8 @@ import palette from '../../lib/styles/palette';
 import Responsive from '../common/Responsive';
 import SubInfo from '../common/SubInfo';
 import Tags from '../common/Tags';
+import CommentList from './CommentList';
+import CommentForm from './CommentForm';
 import { Helmet } from 'react-helmet-async';
 
 const PostViewerBlock = styled(Responsive)`
@@ -25,7 +27,7 @@ const PostContent = styled.div`
   color: ${palette.gray[8]};
 `;
 
-const PostViewer = ({ post, error, loading, actionButtons }) => {
+const PostViewer = ({ post, error, loading, actionButtons, ownPost  }) => {
   // 에러 발생 시
   if (error) {
     if (error.response && error.response.status === 404) {
@@ -38,8 +40,7 @@ const PostViewer = ({ post, error, loading, actionButtons }) => {
   if (loading || !post) {
     return null;
   }
-
-  const { title, body, user, publishedDate, tags } = post;
+  const { title, body, user, publishedDate, tags, comments  } = post;
   return (
     <PostViewerBlock>
       <Helmet>
@@ -54,8 +55,11 @@ const PostViewer = ({ post, error, loading, actionButtons }) => {
         />
         <Tags tags={tags} />
       </PostHead>
-      {actionButtons}
+      
       <PostContent dangerouslySetInnerHTML={{ __html: body }} />
+      {actionButtons}
+      {comments && <CommentList comments={comments} />}
+      {user && <CommentForm postId={post._id} />}
     </PostViewerBlock>
   );
 };

@@ -16,6 +16,7 @@ export const listPosts = ({ page, username, tag }) => {
 };
 
 export const updatePost = ({ id, title, body, tags }) =>
+  
   client.patch(`/api/posts/${id}`, {
     title,
     body,
@@ -23,12 +24,8 @@ export const updatePost = ({ id, title, body, tags }) =>
 });
 
 export const removePost = id => client.delete(`/api/posts/${id}`);
+export const writeComment = ({ postId, text }) =>
+  client.post(`/api/posts/${postId}/comments`, { text });
 
-/*
-import client from './client';
-
-export const writePost = ({ title, body, tags }) =>
-  client.post('/api/posts', { title, body, tags });
-
-export const readPost = id => client.get(`/api/posts/${id}`);
-*/
+export const deleteComment = ({ postId, commentId }) =>
+  client.delete(`/api/posts/${postId}/comments/${commentId}`);

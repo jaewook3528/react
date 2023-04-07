@@ -1,4 +1,4 @@
-import React from 'react';
+import React , {  useState }from 'react';
 import styled from 'styled-components';
 import { Link } from 'react-router-dom';
 import Responsive from '../common/Responsive';
@@ -13,8 +13,18 @@ const PostListBlock = styled(Responsive)`
 
 const WritePostButtonWrapper = styled.div`
   display: flex;
+  height:50px;
   justify-content: flex-end;
   margin-bottom: 3rem;
+  border: 1px solid #dddddd;
+`;
+
+const SearchWrapper = styled.div`
+  display: flex;
+  height:50px;
+  width:300px;
+  margin-bottom: 3rem;
+  border: 1px solid #dddddd;
 `;
 
 const PostItemBlock = styled.div`
@@ -61,7 +71,33 @@ const PostItem = ({ post }) => {
   };
 
   const PostList = ({ posts, loading, error, showWriteButton }) => {
-    // 에러 발생 시
+    const [search, setSearch] = useState('');
+  
+    const onChangeSearch = e => {
+      setSearch(e.target.value);
+    };
+
+    const onKeyPressSearch = e => {
+      if (e.key === 'Enter') {
+        e.preventDefault(); // 기본 동작 방지
+        // 검색 실행
+        console.log('searching...');
+      }
+    };
+  
+    const getSearchedPosts = () => {
+      if (!search) {
+        return posts;
+      } else {
+        return posts.filter(post =>
+          Object.values(post).some(value =>
+            typeof value === 'string' && value.toLowerCase().includes(search.toLowerCase())
+          )
+        );
+      }
+    };
+  
+  
     if (error) {
       return <PostListBlock>에러가 발생했습니다.</PostListBlock>;
     }
@@ -69,16 +105,24 @@ const PostItem = ({ post }) => {
     return (
       <PostListBlock>
         <WritePostButtonWrapper>
+          <SearchWrapper>
+            <input
+              type="text"
+              placeholder="검색어를 입력하세요"
+              value={search}
+              onChange={onChangeSearch}
+              onKeyPress={onKeyPressSearch}
+            />
+          </SearchWrapper>
           {showWriteButton && (
             <Button cyan to="/write">
               새 글 작성하기
             </Button>
           )}
         </WritePostButtonWrapper>
-        {/*  로딩 중이 아니고, 포스트 배열이 존재할 때만 보여 줌 */}
         {!loading && posts && (
           <div>
-            {posts.map(post => (
+            {getSearchedPosts().map(post => (
               <PostItem post={post} key={post._id} />
             ))}
           </div>

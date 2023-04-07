@@ -4,15 +4,17 @@ import { withRouter } from 'react-router-dom';
 import { readPost, unloadPost } from '../../modules/post';
 import PostViewer from '../../components/post/PostViewer';
 import PostActionButtons from '../../components/post/PostActionButtons';
+import CommentList from '../../components/post/CommentList';
+import CommentForm from '../../components/post/CommentForm';
 import { setOriginalPost } from '../../modules/write';
 import { removePost } from '../../lib/api/posts';
 
 const PostViewerContainer = ({ match, history }) => {
-  // 처음 마운트될 때 포스트 읽기 API 요청
   const { postId } = match.params;
   const dispatch = useDispatch();
-  const { post, error, loading, user } = useSelector(({ post, loading, user }) => ({
+  const { post, comments, error, loading, user } = useSelector(({ post, loading, user }) => ({
     post: post.post,
+    comments: post.comments,
     error: post.error,
     loading: loading['post/READ_POST'],
     user: user.user,
@@ -47,7 +49,10 @@ const PostViewerContainer = ({ match, history }) => {
       error={error}
       actionButtons={<PostActionButtons onEdit={onEdit} onRemove={onRemove} />}
       ownPost={user && user.id === post && post.id}
-    />
+    >
+      <CommentList comments={comments} />
+      {user && <CommentForm postId={postId} />}
+    </PostViewer>
   );
 };
 
