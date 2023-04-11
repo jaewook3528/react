@@ -16,7 +16,10 @@ post.patch('/', checkLoggedIn, postsCtrl.checkOwnPost, postsCtrl.update);
 
 // 새로 추가된 라우트
 post.post('/comments', checkLoggedIn, postsCtrl.writeComment);
-post.delete('/comments/:commentId', checkLoggedIn, checkCommentOwn, postsCtrl.deleteComment);
+post.get('/comments', postsCtrl.listComments);
+post.delete('/comments/:commentId', checkLoggedIn, postsCtrl.deleteComment);
+post.post('/replycomments',  checkLoggedIn, postsCtrl.writeCommentReply);
+post.get('/comments/:commentId/replies', postsCtrl.getCommentReplies);
 
 posts.use('/:id', postsCtrl.getPostById, post.routes());
 

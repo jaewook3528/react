@@ -1,4 +1,4 @@
-import React , {  useState }from 'react';
+import React, { useState, useEffect, useRef,useCallback } from 'react';
 import styled from 'styled-components';
 import { Link } from 'react-router-dom';
 import Responsive from '../common/Responsive';
@@ -51,52 +51,73 @@ const PostItemBlock = styled.div`
   }
 `;
 
+const PostItem = React.forwardRef(({ post }, ref) => {
+  const { publishedDate, user, tags, title, body, _id } = post;
+  return (
+    <PostItemBlock ref={ref}>
+      <h2>
+        <Link to={`/@${user.username}/${_id}`}>{title}</Link>
+      </h2>
+      <SubInfo
+        username={user.username}
+        publishedDate={new Date(publishedDate)}
+      />
+      <Tags tags={tags} />
+      <p>{body}</p>
+    </PostItemBlock>
+  );
+});
 
 
-const PostItem = ({ post }) => {
-    const { publishedDate, user, tags, title, body, _id } = post;
-    return (
-      <PostItemBlock>
-        <h2>
-          <Link to={`/@${user.username}/${_id}`}>{title}</Link>
-        </h2>
-        <SubInfo
-          username={user.username}
-          publishedDate={new Date(publishedDate)}
-        />
-        <Tags tags={tags} />
-        <p>{body}</p>
-      </PostItemBlock>
-    );
+
+const PostList = ({ posts, loading, error, showWriteButton }) => {
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const lastPostRef = useRef();
+
+  const onChangeSearch = e => {
+    setSearch(e.target.value);
   };
 
-  const PostList = ({ posts, loading, error, showWriteButton }) => {
-    const [search, setSearch] = useState('');
-  
-    const onChangeSearch = e => {
-      setSearch(e.target.value);
-    };
+  const onKeyPressSearch = e => {
+    if (e.key === 'Enter') {
+      e.preventDefault(); // 기본 동작 방지
+      // 검색 실행
+      console.log('searching...');
+    }
+  };
+ 
+  const onScroll = useCallback(() => {
+    if (lastPostRef.current && 
+      window.scrollY + document.documentElement.clientHeight >
+      lastPostRef.current.offsetTop
+    ) {
+      setPage(page => page + 1);
+    }
+  }, []);
 
-    const onKeyPressSearch = e => {
-      if (e.key === 'Enter') {
-        e.preventDefault(); // 기본 동작 방지
-        // 검색 실행
-        console.log('searching...');
-      }
+
+  useEffect(() => {
+    window.addEventListener('scroll', onScroll);
+    return () => {
+      window.removeEventListener('scroll', onScroll);
     };
+  }, [onScroll]);
   
-    const getSearchedPosts = () => {
-      if (!search) {
-        return posts;
-      } else {
-        return posts.filter(post =>
-          Object.values(post).some(value =>
-            typeof value === 'string' && value.toLowerCase().includes(search.toLowerCase())
-          )
-        );
-      }
-    };
-  
+  const getSearchedPosts = () => {
+    if (!search) {
+      return posts;
+    } else {
+      return posts.filter(post =>
+        Object.values(post).some(
+          value =>
+            typeof value === 'string' &&
+            value.toLowerCase().includes(search.toLowerCase())
+        )
+      );
+    }
+  };
+
   
     if (error) {
       return <PostListBlock>에러가 발생했습니다.</PostListBlock>;
@@ -122,13 +143,19 @@ const PostItem = ({ post }) => {
         </WritePostButtonWrapper>
         {!loading && posts && (
           <div>
-            {getSearchedPosts().map(post => (
-              <PostItem post={post} key={post._id} />
-            ))}
+            {getSearchedPosts()
+              .slice(0, page * 4)
+              .map((post, index) => (
+                <PostItem
+                  post={post}
+                  key={post._id}
+                  ref={index === page * 4 - 1 ? lastPostRef : null}
+                />
+              ))}
           </div>
         )}
       </PostListBlock>
     );
-  };
+};
 
 export default PostList;

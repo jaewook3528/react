@@ -128,7 +128,7 @@ export const list = async ctx => {
     ...(username ? { 'user.username': username } : {}),
     ...(tag ? { tags: tag } : {}),
   };
-
+  /*
   try {
     const posts = await Post.find(query)
       .sort({ _id: -1 })
@@ -145,22 +145,32 @@ export const list = async ctx => {
   } catch (e) {
     ctx.throw(500, e);
   }
+*/
+  try {
+    const posts = await Post.find(query)
+      .sort({ _id: -1 })
+      .lean()
+      .exec();
+    ctx.body = posts.map(post => ({
+      ...post,
+      body: removeHtmlAndShorten(post.body),
+    }));
+  } catch (e) {
+    ctx.throw(500, e);
+  }
+    
 };
 
 export const writeComment = async (ctx) => {
   const { user } = ctx.state;
   const { postId } = ctx.params;
   const { text } = ctx.request.body;
-  //console.log(postId);
-  //console.log(text);
-  //console.log(user);
-
-  //return;
+  
   try {
     const post = ctx.state.post;
     const comment = new Comment({
       text,
-      user: user._id,
+      user: user,
       post: post._id,
     });
     await comment.save();
@@ -170,8 +180,122 @@ export const writeComment = async (ctx) => {
   }
 };
 
+export const writeCommentReply = async (ctx) => {
+  const { user } = ctx.state;
+  const { postId } = ctx.params;
+  const { text, parentCommentId } = ctx.request.body;
+
+  try {
+    const post = ctx.state.post;
+
+    if (!post) {
+      ctx.status = 404; // Not Found
+      return;
+    }
+    const parentComment = await Comment.findById(parentCommentId);
+    if (!parentComment) {
+      ctx.status = 404;
+      return;
+    }
+    //console.log(parentCommentId);
+    //return;
+    const comment = new Comment({
+      text,
+      user,
+      post: post._id,
+      parentCommentId,
+    });
+    await comment.save();
+    parentComment.replies.push(comment._id);
+    await parentComment.save();
+
+    //ctx.body = comment.serialize();
+    ctx.body = comment.toJSON();
+  } catch (e) {
+    ctx.throw(500, e);
+  }
+};
+
+export const listCommentReplies = async (ctx) => {
+  const { postId, commentId } = ctx.params;
+
+  try {
+    const comment = await Comment.findById(commentId);
+    if (!comment) {
+      ctx.status = 404; // Not Found
+      return;
+    }
+    const replies = await Comment.find({ parentCommentId: commentId });
+
+ 
+    ctx.body = replies.map(reply => reply.toJSON());
+  } catch (e) {
+    ctx.throw(500, e);
+  }
+};
+
+export const getCommentReplies = async (ctx) => {
+  const { postId, commentId } = ctx.params;
+
+  try {
+    const response = await listCommentReplies(ctx);
+    ctx.body = response;
+  } catch (e) {
+    ctx.throw(e);
+  }
+};
+
+/**
+ * GET /api/posts/:id/comments
+ * 댓글 목록 조회
+
+export const listComments = async (ctx) => {
+  const { id } = ctx.params;
+
+  try {
+    const comments = await Comment.find({ post: id }).sort({ _id: 1 }).exec();
+    ctx.body = comments;
+  } catch (e) {
+    ctx.throw(500, e);
+  }
+};
+*/
+export const listComments = async (ctx) => {
+  const { id } = ctx.params;
+
+  try {
+    // 1. 댓글과 대댓글을 함께 조회합니다.
+    const comments = await Comment.find({ post: id }).sort({ _id: 1 }).exec();
+    
+    // 2. 조회한 댓글과 대댓글을 구분하여, 각각 다른 배열에 담습니다.
+    const topLevelComments = [];
+    const replies = {};
+    comments.forEach((comment) => {
+      if (!comment.parentCommentId) {
+        topLevelComments.push(comment);
+      } else {
+        const parentCommentId = comment.parentCommentId.toString();
+        if (!replies[parentCommentId]) {
+          replies[parentCommentId] = [];
+        }
+        replies[parentCommentId].push(comment);
+      }
+    });
+
+    // 3. 대댓글 배열에서 각 대댓글의 부모 댓글 ID를 참조하여, 해당 부모 댓글을 찾아 그 하위에 대댓글을 추가합니다.
+    topLevelComments.forEach((comment) => {
+      comment.replies = replies[comment._id.toString()] || [];
+    });
+
+    // 4. 댓글과 대댓글이 각각 담긴 두 개의 배열을 합쳐서 클라이언트에 응답합니다.
+    ctx.body = topLevelComments;
+  } catch (e) {
+    ctx.throw(500, e);
+  }
+};
 export const deleteComment = async (ctx) => {
   const { postId, commentId } = ctx.params;
+
   try {
     await Comment.findByIdAndRemove(commentId).exec();
     ctx.status = 204; // No Content

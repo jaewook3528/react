@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import styled from 'styled-components';
 import palette from '../../lib/styles/palette';
-import { useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import { writeComment } from '../../lib/api/posts';
+import { listComments } from '../../modules/post';
 
 const CommentFormBlock = styled.form`
   h4 {
@@ -29,6 +30,7 @@ const CommentFormBlock = styled.form`
 
 const CommentForm = ({ match, history }) => {
   const [comment, setComment] = useState('');
+  const dispatch = useDispatch();
   const { user } = useSelector(({ user }) => ({
     user: user.user,
   }));
@@ -48,6 +50,7 @@ const CommentForm = ({ match, history }) => {
         text: comment,
       });
       setComment('');
+      dispatch(listComments(postId)); // 댓글 목록 불러오기
       // TODO: 포스트 다시 불러오기
     } catch (e) {
       console.log(e);
