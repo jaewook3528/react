@@ -4,6 +4,8 @@ import palette from '../../lib/styles/palette';
 import Responsive from '../common/Responsive';
 import SubInfo from '../common/SubInfo';
 import Tags from '../common/Tags';
+import CommentList from './CommentList';
+import CommentForm from './CommentForm';
 import { Helmet } from 'react-helmet-async';
 
 const PostViewerBlock = styled(Responsive)`
@@ -23,9 +25,12 @@ const PostHead = styled.div`
 const PostContent = styled.div`
   font-size: 1.3125rem;
   color: ${palette.gray[8]};
+  border:1px solid #eeeeee;
+  min-height:100px;
 `;
 
-const PostViewer = ({ post, error, loading, actionButtons }) => {
+const PostViewer = ({ post,comments, error, loading, actionButtons,loginuser, ownPost }) => {
+  //console.log(ownPost);
   // 에러 발생 시
   if (error) {
     if (error.response && error.response.status === 404) {
@@ -38,8 +43,10 @@ const PostViewer = ({ post, error, loading, actionButtons }) => {
   if (loading || !post) {
     return null;
   }
-
-  const { title, body, user, publishedDate, tags } = post;
+  //console.log(post);
+  const { title, body, user, publishedDate, tags  } = post;
+  //console.log(post);
+ // return false;
   return (
     <PostViewerBlock>
       <Helmet>
@@ -54,8 +61,11 @@ const PostViewer = ({ post, error, loading, actionButtons }) => {
         />
         <Tags tags={tags} />
       </PostHead>
-      {actionButtons}
+      <h4>본문</h4>
       <PostContent dangerouslySetInnerHTML={{ __html: body }} />
+      {actionButtons}
+      {user && comments && <CommentList comments={comments} loginuser={loginuser} />}
+      {user && <CommentForm postId={post._id} />}
     </PostViewerBlock>
   );
 };

@@ -37,6 +37,7 @@ export const writePost = createAction(WRITE_POST, ({ title, body, tags }) => ({
 
 
 export const updatePost = createAction(
+  
   UPDATE_POST,
   ({ id, title, body, tags }) => ({
     id,
@@ -94,6 +95,7 @@ const write = handleActions(
       originalPostId: post._id,
     }),
     [UPDATE_POST_SUCCESS]: (state, { payload: post }) => ({
+      
       ...state,
       post,
     }),

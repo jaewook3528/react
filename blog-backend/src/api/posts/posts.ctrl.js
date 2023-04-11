@@ -1,4 +1,5 @@
 import Post from '../../models/post.js';
+import Comment from '../../models/comment.js';
 import mongoose from 'mongoose';
 import Joi from 'joi';
 import sanitizeHtml from 'sanitize-html';
@@ -37,20 +38,26 @@ export const getPostById = async (ctx, next) => {
   try {
   
     const post = await Post.findById(id);
-  
     // 포스트가 존재하지 않을 때
     if (!post) {
       ctx.status = 404; // Not Found
       return;
     }
     ctx.state.post = post;
-    //console.log(ctx.state.post);
-    //return;
-    return next();
+   // return next();
   } catch (e) {
     //console.log('bb');
     ctx.throw(500, e);
   }
+  // 댓글 데이터 로딩
+  try {
+    const comments = await Comment.find({ post: id });
+    ctx.state.comments = comments;
+  } catch (e) {
+    ctx.throw(500, e);
+  }
+
+  await next();
 };
 
 export const checkOwnPost = (ctx, next) => {
@@ -121,7 +128,7 @@ export const list = async ctx => {
     ...(username ? { 'user.username': username } : {}),
     ...(tag ? { tags: tag } : {}),
   };
-
+  /*
   try {
     const posts = await Post.find(query)
       .sort({ _id: -1 })
@@ -138,60 +145,165 @@ export const list = async ctx => {
   } catch (e) {
     ctx.throw(500, e);
   }
-};
-/*
-export const list = async ctx => {
-  // query는 문자열이기 때문에 숫자로 변환해 주어야 합니다.
-  // 값이 주어지지 않았다면 1을 기본으로 사용합니다.
-  const page = parseInt(ctx.query.page || '1', 10);
-
-  if (page < 1) {
-    ctx.status = 400;
-    return;
-  }
-
-  const { tag, username } = ctx.query;
-  // tag, username 값이 유효하면 객체 안에 넣고, 그렇지 않으면 넣지 않음
-  const query = {
-    ...(username ? { 'user.username': username } : {}),
-    ...(tag ? { tags: tag } : {}),
-  };
-
+*/
   try {
     const posts = await Post.find(query)
       .sort({ _id: -1 })
-      .limit(10)
-      .skip((page - 1) * 10)
       .lean()
       .exec();
-    const postCount = await Post.countDocuments(query).exec();
-    ctx.set('Last-Page', Math.ceil(postCount / 10));
     ctx.body = posts.map(post => ({
       ...post,
-      body:
-        post.body.length < 200 ? post.body : `${post.body.slice(0, 200)}...`,
+      body: removeHtmlAndShorten(post.body),
     }));
   } catch (e) {
     ctx.throw(500, e);
   }
+    
 };
-export const read = async ctx => {
-  const { id } = ctx.params;
+
+export const writeComment = async (ctx) => {
+  const { user } = ctx.state;
+  const { postId } = ctx.params;
+  const { text } = ctx.request.body;
+  
   try {
-    const post = await Post.findById(id).exec();
-    if (!post) {
-      ctx.status = 404; // Not Found
-      return;
-    }
-    ctx.body = post;
+    const post = ctx.state.post;
+    const comment = new Comment({
+      text,
+      user: user,
+      post: post._id,
+    });
+    await comment.save();
+    ctx.body = comment.serialize();
   } catch (e) {
     ctx.throw(500, e);
   }
 };
 
+export const writeCommentReply = async (ctx) => {
+  const { user } = ctx.state;
+  const { postId } = ctx.params;
+  const { text, parentCommentId } = ctx.request.body;
 
-  GET /api/posts/:id
+  try {
+    const post = ctx.state.post;
+
+    if (!post) {
+      ctx.status = 404; // Not Found
+      return;
+    }
+    const parentComment = await Comment.findById(parentCommentId);
+    if (!parentComment) {
+      ctx.status = 404;
+      return;
+    }
+    //console.log(parentCommentId);
+    //return;
+    const comment = new Comment({
+      text,
+      user,
+      post: post._id,
+      parentCommentId,
+    });
+    await comment.save();
+    parentComment.replies.push(comment._id);
+    await parentComment.save();
+
+    //ctx.body = comment.serialize();
+    ctx.body = comment.toJSON();
+  } catch (e) {
+    ctx.throw(500, e);
+  }
+};
+
+export const listCommentReplies = async (ctx) => {
+  const { postId, commentId } = ctx.params;
+
+  try {
+    const comment = await Comment.findById(commentId);
+    if (!comment) {
+      ctx.status = 404; // Not Found
+      return;
+    }
+    const replies = await Comment.find({ parentCommentId: commentId });
+
+ 
+    ctx.body = replies.map(reply => reply.toJSON());
+  } catch (e) {
+    ctx.throw(500, e);
+  }
+};
+
+export const getCommentReplies = async (ctx) => {
+  const { postId, commentId } = ctx.params;
+
+  try {
+    const response = await listCommentReplies(ctx);
+    ctx.body = response;
+  } catch (e) {
+    ctx.throw(e);
+  }
+};
+
+/**
+ * GET /api/posts/:id/comments
+ * 댓글 목록 조회
+
+export const listComments = async (ctx) => {
+  const { id } = ctx.params;
+
+  try {
+    const comments = await Comment.find({ post: id }).sort({ _id: 1 }).exec();
+    ctx.body = comments;
+  } catch (e) {
+    ctx.throw(500, e);
+  }
+};
 */
+export const listComments = async (ctx) => {
+  const { id } = ctx.params;
+
+  try {
+    // 1. 댓글과 대댓글을 함께 조회합니다.
+    const comments = await Comment.find({ post: id }).sort({ _id: 1 }).exec();
+    
+    // 2. 조회한 댓글과 대댓글을 구분하여, 각각 다른 배열에 담습니다.
+    const topLevelComments = [];
+    const replies = {};
+    comments.forEach((comment) => {
+      if (!comment.parentCommentId) {
+        topLevelComments.push(comment);
+      } else {
+        const parentCommentId = comment.parentCommentId.toString();
+        if (!replies[parentCommentId]) {
+          replies[parentCommentId] = [];
+        }
+        replies[parentCommentId].push(comment);
+      }
+    });
+
+    // 3. 대댓글 배열에서 각 대댓글의 부모 댓글 ID를 참조하여, 해당 부모 댓글을 찾아 그 하위에 대댓글을 추가합니다.
+    topLevelComments.forEach((comment) => {
+      comment.replies = replies[comment._id.toString()] || [];
+    });
+
+    // 4. 댓글과 대댓글이 각각 담긴 두 개의 배열을 합쳐서 클라이언트에 응답합니다.
+    ctx.body = topLevelComments;
+  } catch (e) {
+    ctx.throw(500, e);
+  }
+};
+export const deleteComment = async (ctx) => {
+  const { postId, commentId } = ctx.params;
+
+  try {
+    await Comment.findByIdAndRemove(commentId).exec();
+    ctx.status = 204; // No Content
+  } catch (e) {
+    ctx.throw(500, e);
+  }
+};
+
 export const read = ctx => {
   //console.log('cc');
   ctx.body = ctx.state.post;
